@@ -9,18 +9,24 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+https://gt.rstudio.com/articles/case-study-clinical-tables.html
+
 ```{r}
+library(rlang)
+
+rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
+
 custom_summary <- function(df, group_var, sum_var) {
   group_var <- rlang::ensym(group_var)
   sum_var <- rlang::ensym(sum_var)
 
   is_categorical <-
-    is.character(eval(expr(`$`(df, !!sum_var)))) |
-      is.factor(eval(expr(`$`(df, !!sum_var))))
+    is.character(df[[as_string(sum_var)]]) |
+    is.factor(df[[as_string(sum_var)]])
 
   if (is_categorical) {
     category_lbl <-
-      sprintf("%s, n (%%)", attr(eval(expr(`$`(df, !!sum_var))), "label"))
+      as_string(sum_var)
 
     df_out <-
       df |>
@@ -43,12 +49,7 @@ custom_summary <- function(df, group_var, sum_var) {
         category = category_lbl
       )
   } else {
-    category_lbl <-
-      sprintf(
-        "%s (%s)",
-        attr(eval(expr(`$`(df, !!sum_var))), "label"),
-        attr(eval(expr(`$`(df, !!sum_var))), "units")
-      )
+    category_lbl <- as_string(sum_var)
 
     df_out <-
       df |>
@@ -93,8 +94,25 @@ custom_summary <- function(df, group_var, sum_var) {
 adsl_summary <-
   dplyr::filter(rx_adsl, randomized == "Yes") |>
   (\(data) purrr::map_df(
-    .x = dplyr::vars(AGE, AAGEGR1, SEX, ETHNIC, BLBMI),
-    .f = \(x) custom_summary(df = data, group_var = TRTA, sum_var = !!x)
+    .x = dplyr::vars(age, sex, ethnicity, race, bmi),
+    .f = \(x) custom_summary(df = data, group_var = arm, sum_var = !!x)
   ))()
+```
+
+```{r}
+library(gt)
+
+rx_adsl_tbl <-
+  adsl_summary |>
+  gt(
+    rowname_col = "label",
+    groupname_col = "category"
+  ) |>
+  tab_header(
+    title = "x.x: Demographic Characteristics",
+    subtitle = "x.x.x: Demographic Characteristics - ITT Analysis Set"
+  )
+
+rx_adsl_tbl
 ```
 
