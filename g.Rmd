@@ -12,9 +12,27 @@ knitr::opts_chunk$set(echo = TRUE)
 https://gt.rstudio.com/articles/case-study-clinical-tables.html
 
 ```{r}
+library(readr)
+
+rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
+
+str(rx_adsl)
+
+colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tstage", "nstage_cal", "sidedness" )])) #falta ECOG no se cual es
+```
+
+```{r}
 library(rlang)
 
 rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
+
+rx_adsl <- rx_adsl |>
+  dplyr::mutate(
+    arm = dplyr::case_when(
+      grepl("Celecoxib", arm) ~ "Celecoxib",
+      grepl("Placebo", arm) ~ "Placebo"
+    )
+  )
 
 custom_summary <- function(df, group_var, sum_var) {
   group_var <- rlang::ensym(group_var)
@@ -59,31 +77,25 @@ custom_summary <- function(df, group_var, sum_var) {
         mean = mean(!!sum_var, na.rm = TRUE),
         sd = sd(!!sum_var, na.rm = TRUE),
         median = median(!!sum_var, na.rm = TRUE),
-        min = min(!!sum_var, na.rm = TRUE),
-        max = max(!!sum_var, na.rm = TRUE),
-        min_max = NA,
         .groups = "drop"
       ) |>
       tidyr::pivot_longer(
-        cols = c(n, mean, median, min_max),
+        cols = c(n, mean, median),
         names_to = "label",
         values_to = "val"
       ) |>
       dplyr::mutate(
         sd = ifelse(label == "mean", sd, NA),
-        max = ifelse(label == "min_max", max, NA),
-        min = ifelse(label == "min_max", min, NA),
         label = dplyr::recode(
           label,
           "mean" = "Mean (SD)",
-          "min_max" = "Min - Max",
           "median" = "Median"
         )
       ) |>
       tidyr::pivot_wider(
         id_cols = label,
         names_from = !!group_var,
-        values_from = c(val, sd, min, max)
+        values_from = c(val, sd)
       ) |>
       dplyr::mutate(category = category_lbl)
   }
@@ -94,7 +106,7 @@ custom_summary <- function(df, group_var, sum_var) {
 adsl_summary <-
   dplyr::filter(rx_adsl, randomized == "Yes") |>
   (\(data) purrr::map_df(
-    .x = dplyr::vars(age, sex, ethnicity, race, bmi),
+    .x = dplyr::vars(age, sex, ethnicity, race, bmi, aspirin, tstage, nstage_cal, sidedness),
     .f = \(x) custom_summary(df = data, group_var = arm, sum_var = !!x)
   ))()
 ```
@@ -109,10 +121,77 @@ rx_adsl_tbl <-
     groupname_col = "category"
   ) |>
   tab_header(
-    title = "x.x: Demographic Characteristics",
-    subtitle = "x.x.x: Demographic Characteristics - ITT Analysis Set"
+    title = "Baseline Patient Characteristics in Primary Analysis Population" )
+
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  fmt_integer(
+    columns = starts_with(c("val_")),
+    rows = label %in% c("n", "Median")
+  ) |>
+  fmt_percent(
+    columns = starts_with("pct_"),
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = starts_with("val_"),
+    rows = label == "Mean (SD)",
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = starts_with("sd_"),
+    rows = label == "Mean (SD)",
+    decimals = 2
   )
 
 rx_adsl_tbl
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  cols_merge(
+    columns = c("val_Placebo", "pct_Placebo", "sd_Placebo"),
+    pattern = "<<{1}>><< ({2})>><< ({3})>>"
+  ) |>
+  cols_merge(
+    columns = c("val_Celecoxib", "pct_Celecoxib", "sd_Celecoxib"),
+    pattern = "<<{1}>><< ({2})>><< ({3})>>"
+  )
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  tab_stub_indent(
+    rows = everything(),
+    indent = 5
+  ) |>
+  opt_align_table_header(align = "left")
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  cols_width(
+    starts_with("val_") ~ px(200),
+    1 ~ px(250)
+  ) |>
+  cols_align(
+    align = "center",
+    columns = starts_with("val_")
+  )
+
+### Count subjects per arm and summarize values in a list
+arm_n <-
+  rx_adsl |>
+  dplyr::filter(randomized == "Yes") |>
+  dplyr::group_by(arm) |>
+  dplyr::summarize(
+    lbl = sprintf("%s N=%i (100%%)", unique(arm), dplyr::n()),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(arm)
+
+collbl_list <- as.list(arm_n$lbl)
+names(collbl_list) <- paste0("val_", arm_n$arm)
+
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  cols_label(.list = collbl_list)
+
+rx_adsl_tbl
+
 ```
 
