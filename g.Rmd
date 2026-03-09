@@ -27,6 +27,7 @@ library(rlang)
 
 rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
 
+
 rx_adsl <- rx_adsl |>
   dplyr::mutate(
     arm = dplyr::case_when(
