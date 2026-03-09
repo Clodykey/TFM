@@ -18,7 +18,8 @@ rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
 
 str(rx_adsl)
 
-colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tstage", "nstage_cal", "sidedness" )])) #falta ECOG no se cual es
+colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tstage", "nstage_cal", "sidedness", "ps" )]))
+
 ```
 
 ```{r}
@@ -33,7 +34,19 @@ rx_adsl <- rx_adsl |>
       grepl("Placebo", arm) ~ "Placebo"
     )
   )
-
+#ordenar manualmente race:
+rx_adsl <- rx_adsl |>
+  dplyr::mutate(
+    race = factor(
+      race,
+      levels = c(
+        "White",
+        "Black or African American",
+        "Asian",
+        "All others or not reported"
+      )
+    )
+  )
 custom_summary <- function(df, group_var, sum_var) {
   group_var <- rlang::ensym(group_var)
   sum_var <- rlang::ensym(sum_var)
@@ -106,9 +119,26 @@ custom_summary <- function(df, group_var, sum_var) {
 adsl_summary <-
   dplyr::filter(rx_adsl, randomized == "Yes") |>
   (\(data) purrr::map_df(
-    .x = dplyr::vars(age, sex, ethnicity, race, bmi, aspirin, tstage, nstage_cal, sidedness),
+    .x = dplyr::vars(age, sex, race, ethnicity, aspirin, ps, bmi, tstage, nstage_cal, sidedness),
     .f = \(x) custom_summary(df = data, group_var = arm, sum_var = !!x)
   ))()
+#esto lo ha hecho chatgpt:
+adsl_summary <- adsl_summary |>
+  dplyr::mutate(
+    category = dplyr::recode(
+      category,
+      age = "Age, y",
+      sex = "Sex",
+      race = "Race",
+      ethnicity = "Hispanic or Latino",
+      bmi = "BMI",
+      aspirin = "Aspirin Use",
+      ps = "ECOG performance Status",
+      tstage = "Extent of invasion through bowel wall, No./total (%)",
+      nstage_cal = "Nodal Stage",
+      sidedness = "Tumor location"
+    )
+  )
 ```
 
 ```{r}
