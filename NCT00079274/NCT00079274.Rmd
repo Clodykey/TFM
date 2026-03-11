@@ -1,0 +1,326 @@
+---
+title: "NCT00079274"
+author: "Claudia Pascual Tomàs"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(readr)
+
+ds <- readr::read_csv("NCT00079274_unido.csv")
+
+str(ds)
+
+ table(ds$arm)
+```
+
+```{r}
+colSums(is.na(ds[, c("agecat","sex","racecat","nodes", "wild", "bmi2", "stage_g", "histo_g", "arm", "ps", "bwl_obs" )]))
+```
+no hay NAs
+
+```{r}
+library(rlang)
+
+ds <- ds |>
+  dplyr::mutate(
+    arm = dplyr::case_when(
+      grepl("A", arm) ~ "FOLFOX",
+      grepl("D", arm) ~ "FOLFOX + Cetuximab"
+    ),
+    racecat = dplyr::recode(
+      racecat,
+      "w" = "White",
+      "b" = "Black or African American",
+      "oth" = "Other"
+    ),
+    racecat = factor(
+      racecat,
+      levels = c(
+        "White",
+        "Black or African American",
+        "Other"
+      )
+    ),
+    sex = dplyr::recode(
+      sex,
+      "f" = "Female",
+      "m" = "Male"
+    ),
+    wild = dplyr::recode(
+      wild,
+      `1` = "Wild-type",
+      `0` = "Mutant",
+      `-1` = "Unknown"
+    ),
+    stage_g = dplyr::recode(
+      stage_g,
+      `1` = "T1 or T2",
+      `2` = "T3",
+      `3` = "T4"
+    ),
+    stage_g = factor(
+      stage_g,
+      levels = c("T1/2", "T3", "T4")
+    ),
+    histo_g = dplyr::recode(
+      histo_g,
+      `1` = "High (poorly differentiated or undifferentiated)",
+      `2` = "Low (well or moderately differentiated)"
+    ),
+    ps = dplyr::recode(
+      ps,
+      `0` = "0",
+      `1` = "1",
+      `2` = "2"
+    ),
+    nodes = dplyr::recode(
+      nodes,
+      `1` = "1-3",
+      `2` = ">=4"
+    ),
+    bwl_obs = dplyr::recode(
+      bwl_obs,
+      `1` = "Yes",
+      `2` = "No"
+    )
+  )
+custom_summary <- function(df, group_var, sum_var) {
+  group_var <- rlang::ensym(group_var)
+  sum_var <- rlang::ensym(sum_var)
+
+  is_categorical <-
+    is.character(df[[as_string(sum_var)]]) |
+    is.factor(df[[as_string(sum_var)]])
+
+  if (is_categorical) {
+    category_lbl <-
+      as_string(sum_var)
+#para quitar los NA de la tabla. modificado con chatgpt
+    df_out <-
+      df |>
+      dplyr::filter(!is.na(!!sum_var)) |> #chatgpt
+      dplyr::group_by(!!group_var) |>
+      dplyr::mutate(den = dplyr::n()) |> #chatgpt
+      dplyr::group_by(!!group_var, !!sum_var) |>
+      dplyr::summarize(
+        val = dplyr::n(),
+        den = unique(den),
+        pct = val / den,
+        .groups = "drop"
+      ) |>
+      tidyr::pivot_wider(
+        id_cols = !!sum_var, names_from = !!group_var,
+        values_from = c(val, den, pct)
+      ) |>
+      dplyr::rename(label = !!sum_var) |>
+      dplyr::mutate(
+        across(where(is.numeric), ~ ifelse(is.na(.), 0, .)),
+        category = category_lbl
+      )
+  } else {
+    category_lbl <- as_string(sum_var)
+
+    df_out <-
+      df |>
+      dplyr::group_by(!!group_var) |>
+      dplyr::summarize(
+        n = sum(!is.na(!!sum_var)),
+        mean = mean(!!sum_var, na.rm = TRUE),
+        sd = sd(!!sum_var, na.rm = TRUE),
+        median = median(!!sum_var, na.rm = TRUE),
+        lcl = min(!!sum_var, na.rm = TRUE),
+        ucl = max(!!sum_var, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      tidyr::pivot_longer(
+        cols = c(mean, median), #quito n, no hace falta
+        names_to = "label",
+        values_to = "val"
+      ) |>
+      dplyr::mutate(
+        sd = ifelse(label == "mean", sd, NA),
+        label = dplyr::recode(
+          label,
+          "mean" = "Mean (SD)",
+          "median" = "Median (Range)"
+        )
+      ) |>
+      tidyr::pivot_wider(
+        id_cols = label,
+        names_from = !!group_var,
+        values_from = c(val, sd, lcl, ucl)
+      ) |>
+      dplyr::mutate(category = category_lbl)
+  }
+
+  return(df_out)
+}
+
+ds_summary <-
+   ds |>
+  (\(data) purrr::map_df(
+    .x = dplyr::vars(agecat,sex,racecat,nodes,wild,bmi2, bwl_obs, stage_g, histo_g, ps),
+    .f = \(x) custom_summary(df = data, group_var = arm, sum_var = !!x)
+  ))()
+#esto lo ha hecho chatgpt:
+ds_summary <- ds_summary |>
+  dplyr::mutate(
+    category = dplyr::recode(
+      category,
+      agecat = "Age, y",
+      sex = "Sex",
+      racecat = "Race",
+      bmi2 = "BMI",
+      wild = "KRAS",
+      ps = "ECOG performance Status",
+      stage_g = "Extent of invasion through bowel wall, No./total (%)",
+      nodes = "Positive LNs",
+      histo_g = "Histology",
+      bwl_obs = "Bowel obstruction"
+    )
+  )
+
+ds_summary <- ds_summary |>
+  dplyr::mutate(
+    label = dplyr::case_when(
+      category == "BMI" & label == "Median (Range)" ~ "Median",
+      TRUE ~ label
+    )
+  ) 
+```
+```{r}
+library(gt)
+
+ds_tbl <-
+  ds_summary |>
+  gt(
+    rowname_col = "label",
+    groupname_col = "category"
+  ) |>
+  tab_header(
+    title = "Baseline Patient Characteristics in Primary Analysis Population" )
+
+ds_tbl <-
+  ds_tbl |>
+  fmt_integer(
+    columns = starts_with(c("val_")),
+    rows = !(label %in% c("Mean (SD)", "Median")) #para que sean todos los valores enteros excepto media y mediana
+  ) |>
+  fmt_percent(
+    columns = starts_with("pct_"),
+    decimals = 1,
+  ) |>
+  fmt_number(
+    columns = starts_with("val_"),
+    rows = label == "Mean (SD)",
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = starts_with("sd_"),
+    rows = label == "Mean (SD)",
+    decimals = 2
+  ) |>
+  fmt_number(
+    columns = starts_with("lcl_"),
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = starts_with("ucl_"),
+    decimals = 1
+  )|>
+  fmt_number(
+  columns = starts_with("val_"),
+  rows = label == "Median (Range)",
+  decimals = 1
+  ) |>
+  fmt_number(
+  columns = starts_with("val_"),
+  rows = label == "Median",
+  decimals = 1
+  )
+
+ds_tbl <- ds_tbl |>
+  cols_merge(
+    columns = c("val_FOLFOX + Cetuximab", "lcl_FOLFOX + Cetuximab", "ucl_FOLFOX + Cetuximab"),
+    rows = label == "Median (Range)" & category == "Age, y",
+    pattern = "{1} ({2}–{3})"
+  ) |>
+  cols_merge(
+    columns = c("val_FOLFOX", "lcl_FOLFOX", "ucl_FOLFOX"),
+    rows = label == "Median (Range)" & category == "Age, y",
+    pattern = "{1} ({2}–{3})"
+  ) 
+ds_tbl <-
+  ds_tbl |>
+  cols_merge(
+    columns = c("val_FOLFOX + Cetuximab", "pct_FOLFOX + Cetuximab", "sd_FOLFOX + Cetuximab"),
+    rows = !category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)"
+    ),
+    pattern = "<<{1}>><< ({2})>><< ({3})>>"
+  ) |>
+  cols_merge(
+    columns = c("val_FOLFOX", "pct_FOLFOX", "sd_FOLFOX"),
+    rows = !category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)"
+    ),
+    pattern = "<<{1}>><< ({2})>><< ({3})>>"
+  )
+ds_tbl <- ds_tbl |>
+  cols_merge(
+    columns = c("val_FOLFOX + Cetuximab", "den_FOLFOX + Cetuximab", "pct_FOLFOX + Cetuximab"),
+    rows = category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)"
+    ),
+    pattern = "{1}/{2} ({3})"
+  ) |>
+  cols_merge(
+    columns = c("val_FOLFOX", "den_FOLFOX", "pct_FOLFOX"),
+    rows = category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)"
+    ),
+    pattern = "{1}/{2} ({3})"
+  )
+
+ds_tbl <-
+  ds_tbl |>
+  tab_stub_indent(
+    rows = everything(),
+    indent = 5
+  ) |>
+  opt_align_table_header(align = "left")
+ds_tbl <-
+  ds_tbl |>
+  cols_width(
+    starts_with("val_") ~ px(200),
+    1 ~ px(250)
+  ) |>
+  cols_align(
+    align = "center",
+    columns = starts_with("val_")
+  )
+
+### Count subjects per arm and summarize values in a list
+arm_n <-
+  ds |>
+  dplyr::group_by(arm) |>
+  dplyr::summarize(
+    lbl = sprintf("%s N=%i (100%%)", unique(arm), dplyr::n()),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(arm)
+
+collbl_list <- as.list(arm_n$lbl)
+names(collbl_list) <- paste0("val_", arm_n$arm)
+
+ds_tbl <-
+  ds_tbl |>
+  cols_label(.list = collbl_list)
+
+ds_tbl
+```
+
