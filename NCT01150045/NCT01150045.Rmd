@@ -1,0 +1,318 @@
+---
+title: "Untitled"
+author: "Claudia Pascual Tomàs"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+https://gt.rstudio.com/articles/case-study-clinical-tables.html
+
+```{r}
+library(readr)
+
+rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
+
+str(rx_adsl)
+
+colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tstage", "nstage_cal", "sidedness", "ps" )]))
+
+```
+
+```{r}
+library(rlang)
+
+rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
+
+
+rx_adsl <- rx_adsl |>
+  dplyr::mutate(
+    arm = dplyr::case_when(
+      grepl("Celecoxib", arm) ~ "Celecoxib",
+      grepl("Placebo", arm) ~ "Placebo"
+    )
+  )
+#ordenar manualmente race:
+rx_adsl <- rx_adsl |>
+  dplyr::mutate(
+    race = factor(
+      race,
+      levels = c(
+        "White",
+        "Black or African American",
+        "Asian",
+        "All others or not reported"
+      )
+    )
+  )
+custom_summary <- function(df, group_var, sum_var) {
+  group_var <- rlang::ensym(group_var)
+  sum_var <- rlang::ensym(sum_var)
+
+  is_categorical <-
+    is.character(df[[as_string(sum_var)]]) |
+    is.factor(df[[as_string(sum_var)]])
+
+  if (is_categorical) {
+    category_lbl <-
+      as_string(sum_var)
+#para quitar los NA de la tabla. modificado con chatgpt
+    df_out <-
+      df |>
+      dplyr::filter(!is.na(!!sum_var)) |> #chatgpt
+      dplyr::group_by(!!group_var) |>
+      dplyr::mutate(den = dplyr::n()) |> #chatgpt
+      dplyr::group_by(!!group_var, !!sum_var) |>
+      dplyr::summarize(
+        val = dplyr::n(),
+        den = unique(den),
+        pct = val / den,
+        .groups = "drop"
+      ) |>
+      tidyr::pivot_wider(
+        id_cols = !!sum_var, names_from = !!group_var,
+        values_from = c(val, den, pct)
+      ) |>
+      dplyr::rename(label = !!sum_var) |>
+      dplyr::mutate(
+        across(where(is.numeric), ~ ifelse(is.na(.), 0, .)),
+        category = category_lbl
+      )
+  } else {
+    category_lbl <- as_string(sum_var)
+
+    df_out <-
+      df |>
+      dplyr::group_by(!!group_var) |>
+      dplyr::summarize(
+        n = sum(!is.na(!!sum_var)),
+        mean = mean(!!sum_var, na.rm = TRUE),
+        sd = sd(!!sum_var, na.rm = TRUE),
+        median = median(!!sum_var, na.rm = TRUE),
+        lcl = min(!!sum_var, na.rm = TRUE),
+        ucl = max(!!sum_var, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      tidyr::pivot_longer(
+        cols = c(mean, median), #quito n, no hace falta
+        names_to = "label",
+        values_to = "val"
+      ) |>
+      dplyr::mutate(
+        sd = ifelse(label == "mean", sd, NA),
+        label = dplyr::recode(
+          label,
+          "mean" = "Mean (SD)",
+          "median" = "Median (Range)"
+        )
+      ) |>
+      tidyr::pivot_wider(
+        id_cols = label,
+        names_from = !!group_var,
+        values_from = c(val, sd, lcl, ucl)
+      ) |>
+      dplyr::mutate(category = category_lbl)
+  }
+
+  return(df_out)
+}
+
+adsl_summary <-
+  dplyr::filter(rx_adsl, primary_analysis == "Yes") |> #cambiamos rnadomized por primany_analyisis
+  (\(data) purrr::map_df(
+    .x = dplyr::vars(age, sex, race, ethnicity, aspirin, bmi, ps, tstage, nstage_cal, sidedness),
+    .f = \(x) custom_summary(df = data, group_var = arm, sum_var = !!x)
+  ))()
+#esto lo ha hecho chatgpt:
+adsl_summary <- adsl_summary |>
+  dplyr::mutate(
+    category = dplyr::recode(
+      category,
+      age = "Age, y",
+      sex = "Sex",
+      race = "Race",
+      ethnicity = "Hispanic or Latino",
+      bmi = "BMI",
+      aspirin = "Aspirin",
+      ps = "ECOG performance Status",
+      tstage = "Extent of invasion through bowel wall, No./total (%)",
+      nstage_cal = "Nodal Stage",
+      sidedness = "Tumor location, No./total. (%)"
+    )
+  )
+adsl_summary <- adsl_summary |>
+  dplyr::filter(!(category == "Aspirin" & label == "No")) |> #borramos la fila no
+  dplyr::mutate(
+    label = dplyr::case_when(
+      category == "Aspirin" & label == "Yes" ~ "Low dose aspirin usage",
+      TRUE ~ label #cambio la etiqueta Yes por Low dose..
+    )
+  )
+
+adsl_summary <- adsl_summary |>
+  dplyr::mutate(
+    category = dplyr::case_when(
+      category == "Aspirin" ~ "",
+      TRUE ~ category
+    )
+  )
+
+adsl_summary <- adsl_summary |>
+  dplyr::mutate(
+    label = dplyr::case_when(
+      category == "BMI" & label == "Median (Range)" ~ "Median",
+      TRUE ~ label,
+    )
+  ) 
+
+```
+
+```{r}
+library(gt)
+
+rx_adsl_tbl <-
+  adsl_summary |>
+  gt(
+    rowname_col = "label",
+    groupname_col = "category"
+  ) |>
+  tab_header(
+    title = "Baseline Patient Characteristics in Primary Analysis Population" )
+
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  fmt_integer(
+    columns = starts_with(c("val_")),
+    rows = !(label %in% c("Mean (SD)", "Median")) #para que sean todos los valores enteros excepto media y mediana
+  ) |>
+  fmt_percent(
+    columns = starts_with("pct_"),
+    decimals = 1,
+  ) |>
+  fmt_number(
+    columns = starts_with("val_"),
+    rows = label == "Mean (SD)",
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = starts_with("sd_"),
+    rows = label == "Mean (SD)",
+    decimals = 2
+  ) |>
+  fmt_number(
+    columns = starts_with("lcl_"),
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = starts_with("ucl_"),
+    decimals = 1
+  )|>
+  fmt_number(
+  columns = starts_with("val_"),
+  rows = label == "Median (Range)",
+  decimals = 1
+  ) |>
+  fmt_number(
+  columns = starts_with("val_"),
+  rows = label == "Median",
+  decimals = 1
+  )
+
+rx_adsl_tbl <- rx_adsl_tbl |>
+  cols_merge(
+    columns = c("val_Placebo", "lcl_Placebo", "ucl_Placebo"),
+    rows = label == "Median (Range)" & category == "Age, y",
+    pattern = "{1} ({2}–{3})"
+  ) |>
+  cols_merge(
+    columns = c("val_Celecoxib", "lcl_Celecoxib", "ucl_Celecoxib"),
+    rows = label == "Median (Range)" & category == "Age, y",
+    pattern = "{1} ({2}–{3})"
+  ) 
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  cols_merge(
+    columns = c("val_Placebo", "pct_Placebo", "sd_Placebo"),
+    rows = !category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)",
+      "Tumor location"
+    ),
+    pattern = "<<{1}>><< ({2})>><< ({3})>>"
+  ) |>
+  cols_merge(
+    columns = c("val_Celecoxib", "pct_Celecoxib", "sd_Celecoxib"),
+    rows = !category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)",
+      "Tumor location"
+    ),
+    pattern = "<<{1}>><< ({2})>><< ({3})>>"
+  )
+rx_adsl_tbl <- rx_adsl_tbl |>
+  cols_merge(
+    columns = c("val_Placebo", "den_Placebo", "pct_Placebo"),
+    rows = category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)",
+      "Tumor location"
+    ),
+    pattern = "{1}/{2} ({3})"
+  ) |>
+  cols_merge(
+    columns = c("val_Celecoxib", "den_Celecoxib", "pct_Celecoxib"),
+    rows = category %in% c(
+      "Extent of invasion through bowel wall, No./total (%)",
+      "Tumor location"
+    ),
+    pattern = "{1}/{2} ({3})"
+  )
+
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  tab_stub_indent(
+    rows = everything(),
+    indent = 5
+  ) |>
+  opt_align_table_header(align = "left")
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  cols_width(
+    starts_with("val_") ~ px(200),
+    1 ~ px(250)
+  ) |>
+  cols_align(
+    align = "center",
+    columns = starts_with("val_")
+  )
+
+### Count subjects per arm and summarize values in a list
+arm_n <-
+  rx_adsl |>
+  dplyr::filter(primary_analysis == "Yes") |>
+  dplyr::group_by(arm) |>
+  dplyr::summarize(
+    lbl = sprintf("%s N=%i (100%%)", unique(arm), dplyr::n()),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(arm)
+
+collbl_list <- as.list(arm_n$lbl)
+names(collbl_list) <- paste0("val_", arm_n$arm)
+
+rx_adsl_tbl <-
+  rx_adsl_tbl |>
+  cols_label(.list = collbl_list)
+
+rx_adsl_tbl
+
+```
+
+https://gt.rstudio.com/reference/gtsave.html
+```{r}
+#rx_adsl_tbl |> gtsave("rx_adsl_tbl.png", expand = 10)
+#rx_adsl_tbl |> gtsave(filename = "rx_adsl_tbl.html", inline_css = TRUE)
+```
+
