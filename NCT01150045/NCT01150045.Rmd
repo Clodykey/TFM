@@ -372,12 +372,12 @@ survdiff(Surv(os_time, os_event) ~ arm, data = rx_adsl)
 survdiff(Surv(dfs_time, dfs_event) ~ arm, data = rx_adsl)
 
 ```
-Both the ggsurvplot and survdiff yield the same p-value for the log rank test, which is 0.93. Therefore, we fail to reject the null that there is no statistically significant difference in survival between Celecoxib and Placebo.
+Both the ggsurvplot and survdiff yield a p-value for the log rank test > 0,05. Therefore, we fail to reject the null that there is no statistically significant difference in survival between Celecoxib and Placebo.
 
 
 ## Cox proportional hazard model 
 
-Overall survival:
+###Overall survival:
 
 ```{r}
 
@@ -396,4 +396,20 @@ as_gt(model1) %>%
 ```
 The hazard ratio was 1.13 with a 95% confidence interval of 0.95, 1.37. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with Celecoxib and Placebo.
 
+###Disease free survival:
 
+```{r}
+coxmodel_dfs <- coxph(Surv(dfs_time, dfs_event) ~ arm, data = rx_adsl)
+
+exp(coef(coxmodel_dfs))
+
+exp(confint(coxmodel_dfs))
+```
+```{r}
+library(gtsummary)
+modeldfs <- tbl_regression(coxmodel_dfs, intercept = TRUE)
+as_gt(modeldfs) %>% 
+              gt::tab_header("Cox proportional hazards regression model") %>% 
+              gt::tab_options(table.align='left')
+```
+The hazard ratio was 1.16 with a 95% confidence interval of 0.97, 1.40. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with Celecoxib and Placebo.
