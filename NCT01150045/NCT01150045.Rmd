@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "NCT011500045"
 author: "Claudia Pascual Tomàs"
 date: "`r Sys.Date()`"
 output:
@@ -11,12 +11,14 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-https://gt.rstudio.com/articles/case-study-clinical-tables.html
+# Tabla de Distribución
+
+<https://gt.rstudio.com/articles/case-study-clinical-tables.html>
 
 ```{r}
 library(readr)
 
-rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
+rx_adsl <- readr::read_csv("NCT01150045_unido.csv")
 
 str(rx_adsl)
 
@@ -26,9 +28,6 @@ colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tst
 
 ```{r}
 library(rlang)
-
-rx_adsl <- readr::read_csv("Bases de datos/NCT01150045_unido.csv")
-
 
 rx_adsl <- rx_adsl |>
   dplyr::mutate(
@@ -310,9 +309,91 @@ rx_adsl_tbl
 
 ```
 
-https://gt.rstudio.com/reference/gtsave.html
+<https://gt.rstudio.com/reference/gtsave.html>
+
 ```{r}
 #rx_adsl_tbl |> gtsave("rx_adsl_tbl.png", expand = 10)
 #rx_adsl_tbl |> gtsave(filename = "rx_adsl_tbl.html", inline_css = TRUE)
 ```
+
+# Survival Analysis in R
+
+https://rpubs.com/mbounthavong/survival_analysis_in_r 
+
+## Kaplan Meier
+
+```{r}
+names(rx_adsl)
+```
+
+
+```{r}
+library(survival)
+
+table(rx_adsl$os_stat)
+
+table(rx_adsl$dfs_stat)
+
+rx_adsl <- rx_adsl |> #337-347 chatgpt
+  dplyr::mutate(
+    os_event = dplyr::case_when(
+      os_stat == "1=Event" ~ 1,
+      os_stat == "0=Censor" ~ 0
+    ),
+    dfs_event = dplyr::case_when(
+      os_stat == "1=Event" ~ 1,
+      os_stat == "0=Censor" ~ 0
+  )
+)
+
+kmcurve_os <- survfit(Surv(os_time, os_event) ~ arm, data = rx_adsl)
+plot(kmcurve_os)
+kmcurve_dfs <- survfit(Surv(dfs_time, dfs_event) ~ arm, data = rx_adsl)
+plot(kmcurve_dfs)
+```
+```{r}
+library(survminer)
+ggsurvplot(kmcurve_os, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("Celecoxib", "Placebo"),
+           title = "OS Kaplan-Meier curve")
+ggsurvplot(kmcurve_dfs, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("Celecoxib", "Placebo"),
+           title = "DFS Kaplan-Meier curve")
+```
+```{r}
+survdiff(Surv(os_time, os_event) ~ arm, data = rx_adsl)
+
+survdiff(Surv(dfs_time, dfs_event) ~ arm, data = rx_adsl)
+
+```
+Both the ggsurvplot and survdiff yield the same p-value for the log rank test, which is 0.93. Therefore, we fail to reject the null that there is no statistically significant difference in survival between Celecoxib and Placebo.
+
+
+## Cox proportional hazard model 
+
+Overall survival:
+
+```{r}
+
+coxmodel_os <- coxph(Surv(os_time, os_event) ~ arm, data = rx_adsl)
+
+exp(coef(coxmodel_os))
+
+exp(confint(coxmodel_os))
+```
+```{r}
+library(gtsummary)
+model1 <- tbl_regression(coxmodel_os, intercept = TRUE)
+as_gt(model1) %>% 
+              gt::tab_header("Cox proportional hazards regression model") %>% 
+              gt::tab_options(table.align='left')
+```
+The hazard ratio was 1.13 with a 95% confidence interval of 0.95, 1.37. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with Celecoxib and Placebo.
+
 
