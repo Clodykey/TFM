@@ -7,6 +7,8 @@ output:
   html_document: default
 ---
 
+#Tabla de distribución
+
 ```{r}
 library(readr)
 
@@ -323,4 +325,96 @@ ds_tbl <-
 
 ds_tbl
 ```
+#Survival Analysis
 
+## HR, COX y KM
+
+```{r}
+names(ds)
+```
+
+
+```{r}
+library(survival)
+
+kmcurve_dfs <- survfit(Surv(dfstime5, dfsstat5) ~ arm, data = ds)
+plot(kmcurve_dfs)
+kmcurve_fu <- survfit(Surv(futime8, fustat8) ~ arm, data = ds)
+plot(kmcurve_fu)
+kmcurve_pg <- survfit(Surv(pgtime5, pgstat5) ~ arm, data = ds)
+plot(kmcurve_pg)
+```
+
+```{r}
+library(survminer)
+ggsurvplot(kmcurve_dfs, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("FOLFOX", "FOLFOX + Cetuximab"),
+           title = "DFS Kaplan-Meier curve")
+ggsurvplot(kmcurve_fu, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("FOLFOX", "FOLFOX + Cetuximab"),
+           title = "FU Kaplan-Meier curve")
+ggsurvplot(kmcurve_pg, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("FOLFOX", "FOLFOX + Cetuximab"),
+           title = "FU Kaplan-Meier curve")
+```
+### DFS
+```{r}
+coxmodel_dfs <- coxph(Surv(dfstime5, dfsstat5) ~ arm, data = ds)
+
+exp(coef(coxmodel_dfs))
+
+exp(confint(coxmodel_dfs))
+```
+```{r}
+library(gtsummary)
+modeldfs <- tbl_regression(coxmodel_dfs, intercept = TRUE)
+as_gt(modeldfs) %>% 
+              gt::tab_header("Cox proportional hazards regression model") %>% 
+              gt::tab_options(table.align='left')
+```
+
+The hazard ratio was 1.14 with a 95% confidence interval of 0.97, 1.33. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with FOLFOX and FOLFOX + Cetuximab
+
+### FU
+
+```{r}
+coxmodel_fu <- coxph(Surv(futime8, fustat8) ~ arm, data = ds)
+
+exp(coef(coxmodel_fu))
+
+exp(confint(coxmodel_fu))
+```
+```{r}
+modelfu <- tbl_regression(coxmodel_fu, intercept = TRUE)
+as_gt(modelfu) %>% 
+              gt::tab_header("Cox proportional hazards regression model") %>% 
+              gt::tab_options(table.align='left')
+```
+The hazard ratio was 1.22 with a 95% confidence interval of 0.97, 1.55. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with FOLFOX and FOLFOX + Cetuximab
+
+###PG
+```{r}
+coxmodel_pg <- coxph(Surv(pgtime5, pgstat5) ~ arm, data = ds)
+
+exp(coef(coxmodel_pg))
+
+exp(confint(coxmodel_pg))
+
+```
+
+```{r}
+modelpg <- tbl_regression(coxmodel_pg, intercept = TRUE)
+as_gt(modelpg) %>% 
+              gt::tab_header("Cox proportional hazards regression model") %>% 
+              gt::tab_options(table.align='left')
+```
+The hazard ratio was 1.09 with a 95% confidence interval of 0.92, 1.29. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with FOLFOX and FOLFOX + Cetuximab
