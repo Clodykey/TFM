@@ -487,9 +487,7 @@ FALTA: Se aplicarán tests estadísticos apropiados para evaluar el equilibrio e
 
 # 3.Survival Analysis
 
-https://rpubs.com/mbounthavong/survival_analysis_in_r
-
-Sjoberg DD, Whiting K, Curry M, Lavery JA, Larmarange J. Reproducible summary tables with the gtsummary package. The R Journal 2021;13:570–80. https://doi.org/10.32614/RJ-2021-053.
+https://rpubs.com/mbounthavong/survival_analysis_in_r : Sjoberg DD, Whiting K, Curry M, Lavery JA, Larmarange J. Reproducible summary tables with the gtsummary package. The R Journal 2021;13:570–80. https://doi.org/10.32614/RJ-2021-053.
 
 ## Kaplan-Meier curves
 
@@ -632,6 +630,112 @@ library(survminer)
 
 ggforest(res.cox, data = ds2)
 ```
+
+# 4. Análisis de respuesta tumoral (tratamiento y seguimiento)
+•	Evaluación de la adherencia al tratamiento, utilizando la variable treatment adherence.
+
+La adherencia al tratamiento es el grado en que el paciente sigue el tratamiento pautado según el protocolo del ensayo. Indica si el paciente:
+	recibió el tratamiento como estaba previsto,
+	lo completó total o parcialmente,
+	o hubo desviaciones, interrupciones o incumplimiento
+
+```{r}
+table(ds$adherenc)
+prop.table(table(ds$adherenc)) * 100
+
+ggplot(ds, aes(x = factor(adherenc))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Adherence",
+    title = "Distribution of Adherence"
+  ) +
+  scale_x_discrete(labels = c("1" = "Yes", "2" = "No"))
+                   
+```
+
+•	Evaluación del número total de ciclos recibidos, utilizando la variable total number of treatment cycles received.
+
+```{r}
+table(ds$numcycle)
+prop.table(table(ds$numcycle)) * 100
+
+ggplot(ds, aes(x = numcycle)) +
+  geom_histogram() +
+  labs(
+    x = "Num. cycles",
+    title = "Distribution of Cycles Received"
+  )
+                   
+```
+
+
+•	Evaluación del tiempo desde la aleatorización hasta la última terapia del protocolo, utilizando la variable time from randomization to last protocol therapy.
+Nota: esta variable es el tiempo transcurrido desde la aleatorización del paciente (momento en que se asigna al azar a uno de los brazos del estudio) hasta la última terapia recibida.
+
+```{r}
+table(ds$endat_time)
+prop.table(table(ds$endat_time)) * 100
+
+ggplot(ds, aes(x = endat_time)) +
+  geom_histogram() +
+  labs(
+    x = "Num. days",
+    title = "Days from randomization until last protocol therapy was given"
+  )
+```
+
+
+•	Evaluación del motivo de finalización del tratamiento, utilizando la variable reason treatment ended.
+
+```{r}
+table(ds$endatrsn)
+prop.table(table(ds$endatrsn)) * 100
+
+ggplot(ds, aes(x = factor(endatrsn))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Reason"
+  ) +
+  scale_x_discrete(labels = c("1" = "Treatment completed per protocol criteria", "2" = "Refused further therapy", "3" = "Adverse Event/Side Effects/Complications", "4" = "Disease Progression, relapse during active treatment", "5" = "Alternative therapy", "6" = "Other Medical Problems", "7" = "Death on Study", "8" = "Other", "10" = "Disease progression before active treatment", "11" = "Cytogenetic Resistance", "12" = "Refused further treatment before beginning protocol therapy"))
+```
+
+
+•	Evaluación del estado de respuesta en la evaluación más reciente, utilizando la variable response status at most recent assessment.
+
+```{r}
+table(ds$obj_stat)
+prop.table(table(ds$obj_stat)) * 100
+
+ggplot(ds, aes(x = factor(obj_stat))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Responde status"
+  ) +
+  scale_x_discrete(labels = c("0" = "NED", "6" = "Recurrance", "8" = "Not evaluated"))
+```
+
+
+•	Evaluación de la pérdida de seguimiento, utilizando la variable lost to follow-up.
+
+```{r}
+table(ds$lost2fup)
+prop.table(table(ds$lost2fup)) * 100
+
+ggplot(ds, aes(x = lost2fup)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Patient lost to follow up"
+  ) +
+  scale_x_discrete(labels = c("y" = "Yes", "Missing" = "No"))
+```
+
+
+
+# 5. Análisis de seguridad
 
 
 
