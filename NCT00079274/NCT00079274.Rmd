@@ -7,7 +7,6 @@ output:
   html_document: default
 ---
 
-#Tabla de distribución
 
 ```{r}
 library(readr)
@@ -22,7 +21,157 @@ str(ds)
 ```{r}
 colSums(is.na(ds[, c("agecat","sex","racecat","nodes", "wild", "bmi2", "stage_g", "histo_g", "arm", "ps", "bwl_obs" )]))
 ```
-no hay NAs
+# 1. Análisis descriptivo de la población
+
+file:///C:/Users/CLAUDIA%20PASCUAL/Desktop/Master%20Bioinform%C3%A0tica/TFM/NCT00079274/report.html#data-structure
+
+•	Distribución de la categoría de edad, utilizando la variable age category.
+```{r}
+library(ggplot2)
+
+ggplot(ds, aes(x = agecat)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Age",
+    title = "Distribution of Ages", 
+  )
+```
+
+•	Distribución de sexo, utilizando la variable sex.
+```{r}
+ggplot(ds, aes(x = sex)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Sex",
+    title = "Distribution of Sex") +
+    scale_x_discrete(labels = c("m" = "Male", "f" = "Female")
+  )
+```
+
+•	Distribución de raza, utilizando la variable race category.
+```{r}
+ggplot(ds, aes(x = racecat)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Race",
+    title = "Distribution of Races") +
+    scale_x_discrete(labels = c("w" = "White", "oth" = "Other", "b" = "Black or African American")
+                     )
+```
+
+•	Distribución del estado funcional ECOG, utilizando la variable ECOG performance status.
+
+```{r}
+ggplot(ds, aes(x = ps)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "ECOG",
+    title = "Distribution ECOG"
+  )
+```
+
+
+El estado funcional ECOG es una clasificación utilizada en oncología para medir el nivel de actividad del paciente y el impacto de la enfermedad en su vida diaria.
+
+0: totalmente activo
+1: actividad normal con limitaciones leves
+2: capaz de cuidarse a sí mismo, pero incapaz de trabajar
+3: capacidad limitada de autocuidado
+4: completamente dependiente
+5: fallecido
+
+•	Distribución del estado del biomarcador KRAS, utilizando la variable KRAS biomarker status.
+
+```{r}
+ggplot(ds, aes(x = factor(wild))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "KRAS",
+    title = "Distribution of KRAS Biomarker status"
+  ) +
+  scale_x_discrete(labels = c("1" = "Wild-type", "0" = "Mutant", "-1" = "Unknown")
+                     )
+```
+
+
+El estado mutacional del gen KRAS es un biomarcador relevante en cáncer colorrectal que puede influir en la respuesta a determinadas terapias.
+•	Distribución del índice de masa corporal, utilizando la variable body mass index.
+
+```{r}
+ggplot(ds, aes(x = bmi2)) +
+  geom_histogram() +
+  labs(
+    x = "BMI",
+    title = "Distribution of BMI"
+  )
+```
+
+
+•	Distribución de obstrucción intestinal, utilizando la variable bowel obstruction (obstruccion intestinal )
+
+```{r}
+ggplot(ds, aes(x = factor(bwl_obs))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Bowel Obstruction",
+    title = "Distribution of Bowel Obstruction"
+  ) +
+   scale_x_discrete(labels = c("1" = "Yes", "2" = "No")
+                     )
+```
+
+
+•	Distribución de perforación intestinal, utilizando la variable bowel perforation.
+```{r}
+ggplot(ds, aes(x = factor(bwl_perf))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Bowel Perforation",
+    title = "Distribution of bowel perforation"
+  ) +
+   scale_x_discrete(labels = c("1" = "Yes", "2" = "No")
+                     )
+```
+
+•	Distribución del número de ganglios positivos, utilizando la variable number of positive lymph nodes.
+
+```{r}
+ggplot(ds, aes(x = factor(nodes))) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "LNs",
+    title = "Distribution of LNs"
+  ) +
+  scale_x_discrete(labels = c("1" = "1-3", "2" = ">=4")
+                     )
+```
+
+
+•	Distribución por brazo de tratamiento, utilizando la variable treatment arm.
+
+```{r}
+ggplot(ds, aes(x = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Arms",
+    title = "Distribution of treatment's arms"
+  ) +
+  scale_x_discrete(labels = c("A" = "FOLFOX", "D" = "FOLFOX + Cetuximab")
+                     )
+```
+
+
+
+# 2. Comparación de características basales entre brazos
 
 ```{r}
 library(rlang)
@@ -88,8 +237,13 @@ ds <- ds |>
       bwl_obs,
       `1` = "Yes",
       `2` = "No"
-    )
+    ),
+    bwl_perf = dplyr::recode(
+      bwl_perf,
+      `1` = "Yes",
+      `2` = "No"
   )
+)
 custom_summary <- function(df, group_var, sum_var) {
   group_var <- rlang::ensym(group_var)
   sum_var <- rlang::ensym(sum_var)
@@ -165,7 +319,7 @@ custom_summary <- function(df, group_var, sum_var) {
 ds_summary <-
    ds |>
   (\(data) purrr::map_df(
-    .x = dplyr::vars(agecat,sex,racecat,nodes,wild,bmi2, bwl_obs, stage_g, histo_g, ps),
+    .x = dplyr::vars(agecat,sex,racecat,nodes,wild,bmi2, bwl_obs, bwl_perf, stage_g, histo_g, ps),
     .f = \(x) custom_summary(df = data, group_var = arm, sum_var = !!x)
   ))()
 #esto lo ha hecho chatgpt:
@@ -182,7 +336,8 @@ ds_summary <- ds_summary |>
       stage_g = "Extent of invasion through bowel wall, No./total (%)",
       nodes = "Positive LNs",
       histo_g = "Histology",
-      bwl_obs = "Bowel obstruction"
+      bwl_obs = "Bowel obstruction",
+      bwl_perf = "Bowel perforation"
     )
   )
 
@@ -194,6 +349,7 @@ ds_summary <- ds_summary |>
     )
   ) 
 ```
+
 ```{r}
 library(gt)
 
@@ -325,9 +481,17 @@ ds_tbl <-
 
 ds_tbl
 ```
-#Survival Analysis
 
-## HR, COX y KM
+FALTA: Se aplicarán tests estadísticos apropiados para evaluar el equilibrio entre los grupos (chi-cuadrado o Fisher para variables categóricas, y alguna comparación de medias o medianas para variables continuas)
+
+
+# 3.Survival Analysis
+
+https://rpubs.com/mbounthavong/survival_analysis_in_r
+
+Sjoberg DD, Whiting K, Curry M, Lavery JA, Larmarange J. Reproducible summary tables with the gtsummary package. The R Journal 2021;13:570–80. https://doi.org/10.32614/RJ-2021-053.
+
+## Kaplan-Meier curves
 
 ```{r}
 names(ds)
@@ -336,11 +500,13 @@ names(ds)
 
 ```{r}
 library(survival)
-
+#DFS
 kmcurve_dfs <- survfit(Surv(dfstime5, dfsstat5) ~ arm, data = ds)
 plot(kmcurve_dfs)
+#OS
 kmcurve_fu <- survfit(Surv(futime8, fustat8) ~ arm, data = ds)
 plot(kmcurve_fu)
+#recurrence
 kmcurve_pg <- survfit(Surv(pgtime5, pgstat5) ~ arm, data = ds)
 plot(kmcurve_pg)
 ```
@@ -358,15 +524,48 @@ ggsurvplot(kmcurve_fu,
            pval = TRUE,
            risk.table = TRUE,
            legend.labs = c("FOLFOX", "FOLFOX + Cetuximab"),
-           title = "FU Kaplan-Meier curve")
+           title = "OS Kaplan-Meier curve")
 ggsurvplot(kmcurve_pg, 
            conf.int = TRUE,
            pval = TRUE,
            risk.table = TRUE,
            legend.labs = c("FOLFOX", "FOLFOX + Cetuximab"),
-           title = "FU Kaplan-Meier curve")
+           title = "Recurrence Kaplan-Meier curve")
 ```
-### DFS
+
+###Bowel obstruction
+
+```{r}
+kmcurve_os_bwl <- survfit(Surv(futime8, fustat8) ~ bwl_obs, data = ds)
+plot(kmcurve_os_bwl)
+```
+
+```{r}
+ggsurvplot(kmcurve_os_bwl, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("Bowel Obstruction", "No obstruction"),
+           title = "OS Bowel Obstruction Kaplan-Meier curve")
+```
+
+
+```{r}
+kmcurve_dfs_bwl <- survfit(Surv(dfstime5, dfsstat5) ~ bwl_obs, data = ds)
+plot(kmcurve_dfs_bwl)
+```
+```{r}
+ggsurvplot(kmcurve_dfs_bwl, 
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = TRUE,
+           legend.labs = c("Bowel Obstruction", "No obstruction"),
+           title = "DFS Bowel Obstruction Kaplan-Meier curve")
+```
+
+## COX
+
+###DFS
 ```{r}
 coxmodel_dfs <- coxph(Surv(dfstime5, dfsstat5) ~ arm, data = ds)
 
@@ -418,3 +617,21 @@ as_gt(modelpg) %>%
               gt::tab_options(table.align='left')
 ```
 The hazard ratio was 1.09 with a 95% confidence interval of 0.92, 1.29. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with FOLFOX and FOLFOX + Cetuximab
+
+## Hazard Ratio
+
+https://cran.r-project.org/web/packages/survminer/vignettes/ggforest-show-interactions-hazard-ratio.html
+
+```{r}
+ds2 <- read.csv("NCT00079274_unido.csv") #vuelvo a subir el dataset porque me da error por el cambio de etiquetas
+res.cox <- coxph(Surv(futime8, fustat8) ~ agecat + sex + bmi2 + ps + wild + histo_g + numcycle + nodes + arm, data = ds2)
+summary(res.cox, conf.int = FALSE)
+```
+```{r}
+library(survminer)
+
+ggforest(res.cox, data = ds2)
+```
+
+
+
