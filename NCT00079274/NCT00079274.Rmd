@@ -622,22 +622,25 @@ https://cran.r-project.org/web/packages/survminer/vignettes/ggforest-show-intera
 
 ```{r}
 ds2 <- read.csv("NCT00079274_unido.csv") #vuelvo a subir el dataset porque me da error por el cambio de etiquetas
-res.cox <- coxph(Surv(futime8, fustat8) ~ agecat + sex + bmi2 + ps + wild + histo_g + numcycle + nodes + arm, data = ds2)
-summary(res.cox, conf.int = FALSE)
+res.cox.os <- coxph(Surv(futime8, fustat8) ~ agecat + sex + bmi2 + ps + wild + histo_g + numcycle + nodes + arm, data = ds2)
+res.cox.dfs <- coxph(Surv(dfstime5, dfsstat5) ~ agecat + sex + bmi2 + ps + wild + histo_g + numcycle + nodes + arm, data = ds2)
+summary(res.cox.os, conf.int = FALSE)
 ```
 ```{r}
 library(survminer)
 
-ggforest(res.cox, data = ds2)
+ggforest(res.cox.os, data = ds2)
+
+ggforest(res.cox.dfs, data = ds2)
 ```
 
 # 4. Análisis de respuesta tumoral (tratamiento y seguimiento)
 •	Evaluación de la adherencia al tratamiento, utilizando la variable treatment adherence.
 
 La adherencia al tratamiento es el grado en que el paciente sigue el tratamiento pautado según el protocolo del ensayo. Indica si el paciente:
-	recibió el tratamiento como estaba previsto,
-	lo completó total o parcialmente,
-	o hubo desviaciones, interrupciones o incumplimiento
+- recibió el tratamiento como estaba previsto,
+- lo completó total o parcialmente,
+- o hubo desviaciones, interrupciones o incumplimiento
 
 ```{r}
 table(ds$adherenc)
