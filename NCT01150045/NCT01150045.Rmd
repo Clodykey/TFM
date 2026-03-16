@@ -644,3 +644,69 @@ ggforest(res.cox.os, data = ds2)
 
 ggforest(res.cox.dfs, data = ds2)
 ```
+
+# 4. Análisis de respuesta tumoral (tratamiento y seguimiento)
+
+•	Evaluación de la adherencia al tratamiento, utilizando la variable treatment adherence.
+
+La adherencia al tratamiento es el grado en que el paciente sigue el tratamiento pautado según el protocolo del ensayo. Indica si el paciente:
+- recibió el tratamiento como estaba previsto,
+- lo completó total o parcialmente,
+- o hubo desviaciones, interrupciones o incumplimiento
+
+
+```{r}
+table(rx_adsl$celecoxib_adherence)
+prop.table(table(rx_adsl$celecoxib_adherence)) * 100
+
+ggplot(rx_adsl, aes(x = celecoxib_adherence, fill = arm)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Treatment Adherence by Arm", x = "Adherence", fill = "Arm")
+```
+
+
+•	Evaluación del número total de ciclos recibidos, utilizando la variable total number of treatment cycles received.
+
+```{r}
+table(rx_adsl$n_cycles)
+prop.table(table(rx_adsl$n_cycles)) * 100
+
+ggplot(rx_adsl, aes(x = arm, y = n_cycles, fill = arm)) +
+  geom_boxplot() +
+  labs(
+    x = "Arm",
+    y= "Num. Cycles",
+    title = "Total Number of Treatment Cycles Received"
+  )
+```
+
+
+•	Evaluación del tiempo desde la aleatorización hasta la última terapia del protocolo, utilizando la variable time from randomization to last protocol therapy.
+Nota: esta variable es el tiempo transcurrido desde la aleatorización del paciente (momento en que se asigna al azar a uno de los brazos del estudio) hasta la última terapia recibida.
+
+```{r}
+table(rx_adsl$cele_years3)
+prop.table(table(rx_adsl$cele_years3)) * 100
+
+ggplot(rx_adsl, aes(x = cele_years3, fill =  arm)) +
+  geom_histogram() +
+  labs(
+    x = "Num. days",
+    title = "Days from randomization until last protocol therapy was given",
+  )
+```
+
+•	Evaluación del motivo de finalización del tratamiento, utilizando la variable reason treatment ended.
+
+```{r}
+table(rx_adsl$derived_off_tx_rsn)
+prop.table(table(rx_adsl$derived_off_tx_rsn)) * 100
+
+ggplot(rx_adsl, aes(x = derived_off_tx_rsn, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Reason"
+  )
+```
+
