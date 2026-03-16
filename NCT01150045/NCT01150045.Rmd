@@ -7,14 +7,6 @@ output:
   html_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-# 2.  Comparación de características basales entre brazos
-
-<https://gt.rstudio.com/articles/case-study-clinical-tables.html>
-https://github.com/philbowsher/Clinical-Tables-in-R-with-gt/blob/master/gt-01-14_2_01.Rmd 
 ```{r}
 library(readr)
 
@@ -22,9 +14,128 @@ rx_adsl <- readr::read_csv("NCT01150045_unido.csv")
 
 str(rx_adsl)
 
-colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tstage", "nstage_cal", "sidedness", "ps" )]))
+table(rx_adsl$arm)
 
+colSums(is.na(rx_adsl[, c("age","sex","race","ethnicity", "aspirin", "bmi", "tstage", "nstage_cal", "sidedness", "ps" )]))
 ```
+
+
+# 1. Análisis descriptivo de la población
+
+•	Distribución de la categoría de edad, utilizando la variable age.
+```{r}
+library(ggplot2)
+
+rx_adsl <- rx_adsl |>
+  dplyr::mutate(
+    arm = dplyr::case_when(
+      grepl("Celecoxib", arm) ~ "Celecoxib",
+      grepl("Placebo", arm) ~ "Placebo"
+    )
+  )
+
+ggplot(rx_adsl, aes(x = age, fill = arm)) +
+  geom_histogram() + 
+  labs(
+    x = "Age",
+    title = "Distribution of Ages", 
+  )
+```
+
+•	Distribución de sexo, utilizando la variable sex.
+```{r}
+ggplot(rx_adsl, aes(x = sex, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Sex",
+    title = "Distribution of Sex")
+```
+
+•	Distribución de raza, utilizando la variable race category.
+```{r}
+ggplot(rx_adsl, aes(x = race, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Race",
+    title = "Distribution of Races")
+```
+
+•	Distribución del estado funcional ECOG, utilizando la variable ECOG performance status.
+```{r}
+ggplot(rx_adsl, aes(x = ps, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "ECOG",
+    title = "Distribution ECOG"
+  )
+```
+
+•	Distribución del índice de masa corporal, utilizando la variable body mass index.
+
+```{r}
+ggplot(rx_adsl, aes(x = bmi, fill = arm)) +
+  geom_histogram() +
+  labs(
+    x = "BMI",
+    title = "Distribution of BMI"
+  )
+```
+
+•	Distribución de la categoría de aspirina, utilizando la variable aspirin
+
+```{r}
+ggplot(rx_adsl, aes(x = aspirin, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Aspirin",
+    title = "Distribution Aspirin"
+  )  +
+  scale_x_discrete(labels = c("Yes" = "Low dose aspirin usage", "No" = "No usage")
+                     )
+```
+
+•	Distribución del número de ganglios positivos, utilizando la variable n_stage.
+
+```{r}
+ggplot(rx_adsl, aes(x = nstage_cal, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Nodal Stages",
+    title = "Distribution of Nodal Stages"
+  )
+```
+
+Distribución t_stage
+```{r}
+ggplot(rx_adsl, aes(x = tstage, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Invasion",
+    title = "Extent of invasion through bowel wall"
+  )
+```
+
+Distribución sidedness
+```{r}
+ggplot(rx_adsl, aes(x = sidedness, fill = arm)) +
+  geom_bar() +
+  coord_flip() + 
+  labs(
+    x = "Tumor location",
+    title = "Distribution of tumor location"
+  )
+```
+
+# 2.  Comparación de características basales entre brazos
+
+<https://gt.rstudio.com/articles/case-study-clinical-tables.html>
+https://github.com/philbowsher/Clinical-Tables-in-R-with-gt/blob/master/gt-01-14_2_01.Rmd 
 
 ```{r}
 library(rlang)
@@ -121,6 +232,35 @@ custom_summary <- function(df, group_var, sum_var) {
   return(df_out)
 }
 
+compute_pvalue <- function(df, group_var, sum_var) {
+  group_var_str <- rlang::as_string(rlang::ensym(group_var))
+  sum_var_str   <- rlang::as_string(rlang::ensym(sum_var))
+  
+  is_categorical <- is.character(df[[sum_var_str]]) | is.factor(df[[sum_var_str]])
+  
+  df_clean <- df[!is.na(df[[sum_var_str]]) & !is.na(df[[group_var_str]]), ]
+  
+  if (is_categorical) {
+    tbl      <- table(df_clean[[group_var_str]], df_clean[[sum_var_str]])
+    expected <- suppressWarnings(chisq.test(tbl)$expected)
+    
+    if (any(expected < 5)) {
+      p         <- fisher.test(tbl, simulate.p.value = TRUE, B = 10000)$p.value
+      test_used <- "Fisher's exact"
+    } else {
+      p         <- suppressWarnings(chisq.test(tbl)$p.value)
+      test_used <- "Chi-square"
+    }
+    
+  } else {
+    groups    <- split(df_clean[[sum_var_str]], df_clean[[group_var_str]])
+    p         <- wilcox.test(groups[[1]], groups[[2]])$p.value
+    test_used <- "Wilcoxon rank-sum"
+  }
+  
+  tibble::tibble(category = sum_var_str, p_value = p, test_used = test_used)
+}
+
 adsl_summary <-
   dplyr::filter(rx_adsl, primary_analysis == "Yes") |> #cambiamos rnadomized por primany_analyisis
   (\(data) purrr::map_df(
@@ -168,6 +308,41 @@ adsl_summary <- adsl_summary |>
       TRUE ~ label,
     )
   ) 
+
+pvalue_df <- purrr::map_df(
+  .x = c("age", "sex", "race", "ethnicity", "aspirin",
+         "bmi", "tstage", "nstage_cal", "sidedness", "ps"),
+  .f = ~ compute_pvalue(df = rx_adsl, group_var = arm, sum_var = !!rlang::sym(.x))
+)
+
+pvalue_df <- pvalue_df |>
+  dplyr::mutate(
+    category = dplyr::recode(
+      category,
+      age = "Age, y",
+      sex = "Sex",
+      race = "Race",
+      ethnicity = "Hispanic or Latino",
+      bmi = "BMI",
+      aspirin = "Aspirin",
+      ps = "ECOG performance Status",
+      tstage = "Extent of invasion through bowel wall, No./total (%)",
+      nstage_cal = "Nodal Stage",
+      sidedness = "Tumor location, No./total. (%)"
+    )
+  )
+
+adsl_summary <- adsl_summary |>
+  dplyr::group_by(category) |>
+  dplyr::mutate(row_num = dplyr::row_number()) |>
+  dplyr::ungroup() |>
+  dplyr::left_join(pvalue_df, by = "category") |>
+  dplyr::mutate(
+    p_value   = dplyr::if_else(row_num == 1, p_value, NA_real_),
+    test_used = dplyr::if_else(row_num == 1, test_used, NA_character_)
+  ) |>
+  dplyr::select(-row_num)
+
 
 ```
 
@@ -305,6 +480,32 @@ rx_adsl_tbl <-
   rx_adsl_tbl |>
   cols_label(.list = collbl_list)
 
+rx_adsl_tbl <- rx_adsl_tbl |>
+  # Formato del p-valor
+  fmt_number(
+    columns = "p_value",
+    decimals = 3
+  ) |>
+  # Valores muy pequeños como "<0.001"
+  sub_small_vals(
+    columns  = "p_value",
+    threshold = 0.001
+  ) |>
+  # Celdas vacías (NA) en blanco
+  sub_missing(
+    columns = "p_value",
+    missing_text = ""
+  ) |>
+  cols_label(p_value = md("*P* Value")) |>
+  cols_align(align = "center", columns = "p_value") |>
+  cols_width("p_value" ~ px(100)) |>
+  cols_hide(columns = "test_used") |>
+  # Nota al pie explicando los tests usados
+  tab_footnote(
+    footnote = "Chi-square or Fisher's exact test for categorical variables; Wilcoxon rank-sum test for continuous variables.",
+    locations = cells_column_labels(columns = "p_value")
+  )
+
 rx_adsl_tbl
 
 ```
@@ -334,15 +535,15 @@ table(rx_adsl$os_stat)
 
 table(rx_adsl$dfs_stat)
 
-rx_adsl <- rx_adsl |> #337-347 chatgpt
+rx_adsl <- rx_adsl |>
   dplyr::mutate(
     os_event = dplyr::case_when(
       os_stat == "1=Event" ~ 1,
       os_stat == "0=Censor" ~ 0
     ),
     dfs_event = dplyr::case_when(
-      os_stat == "1=Event" ~ 1,
-      os_stat == "0=Censor" ~ 0
+      dfs_stat == "1=Event" ~ 1,
+      dfs_stat == "0=Censor" ~ 0
   )
 )
 
@@ -413,5 +614,33 @@ as_gt(modeldfs) %>%
               gt::tab_options(table.align='left')
 ```
 The hazard ratio was 1.16 with a 95% confidence interval of 0.97, 1.40. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with Celecoxib and Placebo.
+
 ## Hazard ratio
 
+
+```{r}
+ds2 <- read.csv("NCT01150045_unido.csv") #vuelvo a subir el dataset porque me da error por el cambio de etiquetas
+
+ds2 <- ds2 |>
+  dplyr::mutate(
+    os_event = dplyr::case_when(
+      os_stat == "1=Event" ~ 1,
+      os_stat == "0=Censor" ~ 0
+    ),
+    dfs_event = dplyr::case_when(
+      dfs_stat == "1=Event" ~ 1,
+      dfs_stat == "0=Censor" ~ 0
+  )
+)
+res.cox.os <- coxph(Surv(os_time, os_event) ~ age + sex + bmi + ps + aspirin + tstage + n_cycles + nstage_cal + arm, data = ds2)
+res.cox.dfs <- coxph(Surv(dfs_time, dfs_event) ~ age + sex + bmi + ps + aspirin + tstage + n_cycles + nstage_cal + arm, data = ds2)
+summary(res.cox.os, conf.int = FALSE)
+```
+
+```{r}
+library(survminer)
+
+ggforest(res.cox.os, data = ds2)
+
+ggforest(res.cox.dfs, data = ds2)
+```
