@@ -11,10 +11,10 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Tabla de Distribución
+# 2.  Comparación de características basales entre brazos
 
 <https://gt.rstudio.com/articles/case-study-clinical-tables.html>
-
+https://github.com/philbowsher/Clinical-Tables-in-R-with-gt/blob/master/gt-01-14_2_01.Rmd 
 ```{r}
 library(readr)
 
@@ -316,7 +316,7 @@ rx_adsl_tbl
 #rx_adsl_tbl |> gtsave(filename = "rx_adsl_tbl.html", inline_css = TRUE)
 ```
 
-# Survival Analysis in R
+# 3. Survival Analysis in R
 
 https://rpubs.com/mbounthavong/survival_analysis_in_r 
 
@@ -413,3 +413,5 @@ as_gt(modeldfs) %>%
               gt::tab_options(table.align='left')
 ```
 The hazard ratio was 1.16 with a 95% confidence interval of 0.97, 1.40. Since the 95% confidence interval crosses where the HR=1, we fail to reject the null hypothesis that there is no significant differences in hazards between subjects in Treatment with Celecoxib and Placebo.
+## Hazard ratio
+
