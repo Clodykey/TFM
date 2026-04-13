@@ -3,8 +3,8 @@ title: "NCT00079274"
 author: "Claudia Pascual Tomàs"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 
@@ -15,7 +15,7 @@ ds <- readr::read_csv("NCT00079274_unido.csv")
 
 str(ds)
 
- table(ds$arm)
+table(ds$arm)
 ```
 
 ```{r}
@@ -23,13 +23,11 @@ colSums(is.na(ds[, c("agecat","sex","racecat","nodes", "wild", "bmi2", "stage_g"
 ```
 # 1. Análisis descriptivo de la población
 
-file:///C:/Users/CLAUDIA%20PASCUAL/Desktop/Master%20Bioinform%C3%A0tica/TFM/NCT00079274/report.html#data-structure
-
 •	Distribución de la categoría de edad, utilizando la variable age category.
 ```{r}
 library(ggplot2)
 
-ggplot(ds, aes(x = agecat)) +
+ggplot(ds, aes(x = agecat, fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -40,7 +38,7 @@ ggplot(ds, aes(x = agecat)) +
 
 •	Distribución de sexo, utilizando la variable sex.
 ```{r}
-ggplot(ds, aes(x = sex)) +
+ggplot(ds, aes(x = sex, fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -52,7 +50,7 @@ ggplot(ds, aes(x = sex)) +
 
 •	Distribución de raza, utilizando la variable race category.
 ```{r}
-ggplot(ds, aes(x = racecat)) +
+ggplot(ds, aes(x = racecat, fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -65,7 +63,7 @@ ggplot(ds, aes(x = racecat)) +
 •	Distribución del estado funcional ECOG, utilizando la variable ECOG performance status.
 
 ```{r}
-ggplot(ds, aes(x = ps)) +
+ggplot(ds, aes(x = ps, fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -87,7 +85,7 @@ El estado funcional ECOG es una clasificación utilizada en oncología para medi
 •	Distribución del estado del biomarcador KRAS, utilizando la variable KRAS biomarker status.
 
 ```{r}
-ggplot(ds, aes(x = factor(wild))) +
+ggplot(ds, aes(x = factor(wild), fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -103,7 +101,7 @@ El estado mutacional del gen KRAS es un biomarcador relevante en cáncer colorre
 •	Distribución del índice de masa corporal, utilizando la variable body mass index.
 
 ```{r}
-ggplot(ds, aes(x = bmi2)) +
+ggplot(ds, aes(x = bmi2, fill = arm)) +
   geom_histogram() +
   labs(
     x = "BMI",
@@ -115,7 +113,7 @@ ggplot(ds, aes(x = bmi2)) +
 •	Distribución de obstrucción intestinal, utilizando la variable bowel obstruction (obstruccion intestinal )
 
 ```{r}
-ggplot(ds, aes(x = factor(bwl_obs))) +
+ggplot(ds, aes(x = factor(bwl_obs), fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -129,7 +127,7 @@ ggplot(ds, aes(x = factor(bwl_obs))) +
 
 •	Distribución de perforación intestinal, utilizando la variable bowel perforation.
 ```{r}
-ggplot(ds, aes(x = factor(bwl_perf))) +
+ggplot(ds, aes(x = factor(bwl_perf), fill = arm)) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -143,7 +141,7 @@ ggplot(ds, aes(x = factor(bwl_perf))) +
 •	Distribución del número de ganglios positivos, utilizando la variable number of positive lymph nodes.
 
 ```{r}
-ggplot(ds, aes(x = factor(nodes))) +
+ggplot(ds, aes(x = factor(nodes), fill = arm )) +
   geom_bar() +
   coord_flip() + 
   labs(
@@ -178,10 +176,7 @@ library(rlang)
  
 ds <- ds |>
   dplyr::mutate(
-    arm = dplyr::case_when(
-      grepl("A", arm) ~ "FOLFOX",
-      grepl("D", arm) ~ "FOLFOX + Cetuximab"
-    ),
+    arm = dplyr::recode(arm, "A" = "FOLFOX", "D" = "FOLFOX + Cetuximab"),
     agecat = factor(agecat),
     racecat = dplyr::recode(
       racecat,
@@ -326,17 +321,10 @@ compute_pvalue <- function(df, group_var, sum_var) {
   
   df_clean <- df[!is.na(df[[sum_var_str]]) & !is.na(df[[group_var_str]]), ]
   
-  if (is_categorical) {
-    tbl      <- table(df_clean[[group_var_str]], df_clean[[sum_var_str]])
-    expected <- suppressWarnings(chisq.test(tbl)$expected)
-    
-    if (any(expected < 5)) {
-      p         <- fisher.test(tbl, simulate.p.value = TRUE, B = 10000)$p.value
-      test_used <- "Fisher's exact"
-    } else {
-      p         <- suppressWarnings(chisq.test(tbl)$p.value)
-      test_used <- "Chi-square"
-    }
+   if (is_categorical) {
+    tbl       <- table(df_clean[[group_var_str]], df_clean[[sum_var_str]])
+    p         <- suppressWarnings(chisq.test(tbl)$p.value)
+    test_used <- "Chi-square"
     
   } else {
     groups    <- split(df_clean[[sum_var_str]], df_clean[[group_var_str]])
@@ -415,8 +403,6 @@ ds_summary <- ds_summary |>
     test_used = dplyr::if_else(row_num == 1, test_used, NA_character_)
   ) |>
   dplyr::select(-row_num)
-
-
 ```
 
 ```{r}
@@ -570,7 +556,7 @@ ds_tbl <- ds_tbl |>
   cols_hide(columns = "test_used") |>
   # Nota al pie explicando los tests usados
   tab_footnote(
-    footnote = "Chi-square or Fisher's exact test for categorical variables; Wilcoxon rank-sum test for continuous variables.",
+    footnote = "Chi-square test for categorical variables; Wilcoxon rank-sum test for continuous variables.",
     locations = cells_column_labels(columns = "p_value")
   )
 
@@ -590,7 +576,7 @@ names(ds)
 
 
 ```{r}
-library(survival)
+library(survival) #Version 3.8-3
 #DFS
 kmcurve_dfs <- survfit(Surv(dfstime5, dfsstat5) ~ arm, data = ds)
 plot(kmcurve_dfs)
@@ -603,7 +589,10 @@ plot(kmcurve_pg)
 ```
 
 ```{r}
-library(survminer)
+library(survminer) #0.5.2
+#survival 3.8-6
+#ggsurvfit version 1.2.0
+#survMisc version0.5.6
 ggsurvplot(kmcurve_dfs, 
            conf.int = TRUE,
            pval = TRUE,
@@ -622,36 +611,60 @@ ggsurvplot(kmcurve_pg,
            risk.table = TRUE,
            legend.labs = c("FOLFOX", "FOLFOX + Cetuximab"),
            title = "Recurrence Kaplan-Meier curve")
+#transformar dias en meses.
 ```
 
 ###Bowel obstruction
 
 ```{r}
-kmcurve_os_bwl <- survfit(Surv(futime8, fustat8) ~ bwl_obs, data = ds)
+ds_armD <- ds |> dplyr::filter(arm == "FOLFOX + Cetuximab")
+
+kmcurve_os_bwl <- survfit(Surv(futime8, fustat8) ~ bwl_obs, data = ds_armD)
 plot(kmcurve_os_bwl)
 ```
 
-```{r}
-ggsurvplot(kmcurve_os_bwl, 
+```{r, fig.width=10, fig.height=14}
+ggsurvplot(kmcurve_os_bwl,
            conf.int = TRUE,
            pval = TRUE,
            risk.table = TRUE,
-           legend.labs = c("Bowel Obstruction", "No obstruction"),
-           title = "OS Bowel Obstruction Kaplan-Meier curve")
+           legend.labs = c("OBS -", "OBS +"),
+           title = "OS Bowel Obstruction Kaplan-Meier curve",
+           #fun = "event",
+           #ylab = "Died (%)",
+           break.y.by = 0.25,
+           ylim = c(0, 1),
+           xscale = "d_m",
+           xlab = "Time in months",
+           xlim = c(0, 1880),
+           break.x.by = 304.4
+           )
+#como en el otro ensayo. preprocesar cortando en 6. 
 ```
 
 
 ```{r}
-kmcurve_dfs_bwl <- survfit(Surv(dfstime5, dfsstat5) ~ bwl_obs, data = ds)
+kmcurve_dfs_bwl <- survfit(Surv(dfstime5, dfsstat5) ~ bwl_obs, data = ds_armD)
 plot(kmcurve_dfs_bwl)
 ```
-```{r}
+
+```{r, fig.width=10, fig.height=14}
 ggsurvplot(kmcurve_dfs_bwl, 
            conf.int = TRUE,
            pval = TRUE,
            risk.table = TRUE,
-           legend.labs = c("Bowel Obstruction", "No obstruction"),
-           title = "DFS Bowel Obstruction Kaplan-Meier curve")
+           legend.labs = c("OBS -", "OBS +"),
+           title = "DFS Bowel Obstruction Kaplan-Meier curve",
+           #fun = "event",
+           #ylab = "DFS event (%)",
+           #surv.scale = "percent",
+           break.y.by = 0.25,
+           ylim = c(0, 1),
+           xscale = "d_m",
+           xlab = "Time in months",
+           xlim = c(0, 1880),
+           break.x.by = 304.4
+           )
 ```
 
 ## COX
@@ -715,21 +728,29 @@ https://cran.r-project.org/web/packages/survminer/vignettes/ggforest-show-intera
 
 ```{r}
 ds2 <- read.csv("NCT00079274_unido.csv") #vuelvo a subir el dataset porque me da error por el cambio de etiquetas
-res.cox.os <- coxph(Surv(futime8, fustat8) ~ agecat + sex + bmi2 + ps + wild + histo_g + numcycle + nodes + arm, data = ds2)
-res.cox.dfs <- coxph(Surv(dfstime5, dfsstat5) ~ agecat + sex + bmi2 + ps + wild + histo_g + numcycle + nodes + arm, data = ds2)
+
+res.cox.os <- coxph(Surv(futime8, fustat8) ~ agecat + sex + bmi2 + ps + histo_g  + nodes + stage_g + bwl_obs, data = ds2)
+res.cox.dfs <- coxph(Surv(dfstime5, dfsstat5) ~ agecat + sex + bmi2 + ps + histo_g + nodes + stage_g + bwl_obs, data = ds2)
 summary(res.cox.os, conf.int = FALSE)
 ```
+
 ```{r}
-library(survminer)
+library(survminer) #0.5.2
+
+#DE momento se queda asi, hasta tener el 2n ds. 
 
 ggforest(res.cox.os, data = ds2)
 
-ggforest(res.cox.dfs, data = ds2)
+ggforest(res.cox.dfs, data = ds2) #fatla categorizar como está en el paper. sex vs female...etc 
+```
+
+```{r}
+library(forestplot)
+
 ```
 
 # 4. Análisis de respuesta tumoral (tratamiento y seguimiento)
 •	Evaluación de la adherencia al tratamiento, utilizando la variable treatment adherence.
-
 La adherencia al tratamiento es el grado en que el paciente sigue el tratamiento pautado según el protocolo del ensayo. Indica si el paciente:
 - recibió el tratamiento como estaba previsto,
 - lo completó total o parcialmente,
