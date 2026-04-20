@@ -576,7 +576,7 @@ names(ds)
 
 
 ```{r}
-library(survival) #Version 3.8-3
+library(survival) 
 #DFS
 kmcurve_dfs <- survfit(Surv(dfstime5, dfsstat5) ~ arm, data = ds)
 plot(kmcurve_dfs)
@@ -617,13 +617,21 @@ ggsurvplot(kmcurve_pg,
 ###Bowel obstruction
 
 ```{r}
+
 ds_armD <- ds |> dplyr::filter(arm == "FOLFOX + Cetuximab")
 
+ds_armD <- ds_armD |>
+  dplyr::mutate(
+    fustat8 = dplyr::if_else(futime8  > 1880, 0L, fustat8),
+    futime8 = dplyr::if_else(futime8  > 1880, 1880L, futime8),
+    dfsstat5 = dplyr::if_else(dfstime5 > 1880, 0L, dfsstat5),
+    dfstime5 = dplyr::if_else(dfstime5 > 1880, 1880L, dfstime5)
+  )
 kmcurve_os_bwl <- survfit(Surv(futime8, fustat8) ~ bwl_obs, data = ds_armD)
 plot(kmcurve_os_bwl)
 ```
 
-```{r, fig.width=10, fig.height=14}
+```{r, fig.width=8, fig.height=8}
 ggsurvplot(kmcurve_os_bwl,
            conf.int = TRUE,
            pval = TRUE,
@@ -633,13 +641,12 @@ ggsurvplot(kmcurve_os_bwl,
            #fun = "event",
            #ylab = "Died (%)",
            break.y.by = 0.25,
-           ylim = c(0, 1),
+           ylim = c(0.5, 1),
            xscale = "d_m",
            xlab = "Time in months",
            xlim = c(0, 1880),
            break.x.by = 304.4
            )
-#como en el otro ensayo. preprocesar cortando en 6. 
 ```
 
 
@@ -648,7 +655,7 @@ kmcurve_dfs_bwl <- survfit(Surv(dfstime5, dfsstat5) ~ bwl_obs, data = ds_armD)
 plot(kmcurve_dfs_bwl)
 ```
 
-```{r, fig.width=10, fig.height=14}
+```{r, fig.width=8, fig.height=8}
 ggsurvplot(kmcurve_dfs_bwl, 
            conf.int = TRUE,
            pval = TRUE,
@@ -659,7 +666,7 @@ ggsurvplot(kmcurve_dfs_bwl,
            #ylab = "DFS event (%)",
            #surv.scale = "percent",
            break.y.by = 0.25,
-           ylim = c(0, 1),
+           ylim = c(0.15, 1),
            xscale = "d_m",
            xlab = "Time in months",
            xlim = c(0, 1880),
