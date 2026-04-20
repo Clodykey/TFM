@@ -526,6 +526,15 @@ rx_adsl <- rx_adsl |>
     ),
   )
 
+#corte en 6 años
+rx_adsl <- rx_adsl |>
+  dplyr::mutate(
+    os_event  = dplyr::if_else(os_time  > 72.0000001, 0L, os_event),
+    os_time   = dplyr::if_else(os_time  > 72.0000001, 72.0000001, os_time),
+    dfs_event = dplyr::if_else(dfs_time > 72.0000001, 0L, dfs_event),
+    dfs_time  = dplyr::if_else(dfs_time > 72.0000001, 72.0000001, dfs_time)
+  )
+
 kmcurve_os <- survfit(Surv(os_time, os_event) ~ arm, data = rx_adsl)
 plot(kmcurve_os)
 kmcurve_dfs <- survfit(Surv(dfs_time, dfs_event) ~ arm, data = rx_adsl)
@@ -533,9 +542,9 @@ plot(kmcurve_dfs)
 ```
 https://www.rdocumentation.org/packages/survminer/versions/0.5.2/topics/ggsurvplot 
 https://cran.r-project.org/web/packages/survminer/refman/survminer.html#ggsurvplot 
-```{r, fig.width=10, fig.height=14}
+```{r, fig.width=8, fig.height=8}
 library(survminer)
-ggsurvplot(kmcurve_os,
+OS_bwl_plot <- ggsurvplot(kmcurve_os,
            conf.int = TRUE,
            pval = TRUE,
            risk.table = TRUE,
@@ -544,15 +553,16 @@ ggsurvplot(kmcurve_os,
            fun = "event", #"event" plots cumulative events (f(y) = 1-y)
            ylab = "Died (%)",
            surv.scale = "percent",
-           break.y.by = 0.2, #para que el eje y tenga marcas cada 20 puntos
-           ylim = c(0, 1), #eje de 0 a 100 porque es un porcentaje de eventos, no de supervivencia  
+           break.y.by = 0.1, #para que el eje y tenga marcas cada 10 puntos
+           ylim = c(0, 0.3), 
            xscale = "m_y",
            xlim = c(0, 72.0000001),  #para que el eje x vaya de 0 a 6 años (72 meses)
            break.x.by = 12
            )
-        #cortar sobre 55% aprox
 
-ggsurvplot(kmcurve_dfs,
+OS_bwl_plot
+
+DFS_bwl_plot<- ggsurvplot(kmcurve_dfs,
            conf.int = TRUE,
            pval = TRUE,
            risk.table = TRUE,
@@ -561,14 +571,13 @@ ggsurvplot(kmcurve_dfs,
            fun = "event",
            ylab = "DFS Event (%)",
            surv.scale = "percent",
-           break.y.by = 0.2,
-           ylim = c(0, 1), #eje de 0 a 100 porque es un porcentaje de eventos, no de supervivencia
+           break.y.by = 0.1,
+           ylim = c(0, 0.5), 
            xscale = "m_y",
-           xlim = c(0, 72.0000001), 
+           xlim = c(0, 72.0000001),
            break.x.by = 12,
            )
-#cortar cobre 65~70 la de dfs
-#en vez de filtrar por la gráfica, filtrar-lo como preprocesamiento de datos. No quitar a nivel de gráfica
+DFS_bwl_plot
 
 ```
 
